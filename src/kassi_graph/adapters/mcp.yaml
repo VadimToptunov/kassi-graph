@@ -1,0 +1,177 @@
+name: mcp
+language: typescript
+version: "1.0"
+
+# Adapter for MCP (Model Context Protocol) servers. Companion to
+# kassi-mcp-scanner — identifies MCP tool handlers (sources) and traces
+# untrusted LLM-supplied argument flow into dangerous sinks.
+#
+# MCP servers in the wild use several SDK shapes:
+#   - @modelcontextprotocol/sdk: server.setRequestHandler(..., async (req) => ...)
+#   - server.tool("name", schema, async (args) => ...)
+#   - FastMCP: @mcp.tool() decorator pattern (Python/TS)
+# The source patterns here cover the common idioms.
+
+sources:
+  # MCP SDK tool registration — the handler arg BECOMES a routes_to target.
+  - kind: call
+    pattern: "server.tool"
+    description: "MCP server.tool(name, schema, handler)"
+  - kind: call
+    pattern: "server.setRequestHandler"
+    description: "MCP setRequestHandler(schema, handler)"
+  - kind: call
+    pattern: "mcp.tool"
+  - kind: call
+    pattern: "mcp.setRequestHandler"
+  - kind: call
+    pattern: "*.registerTool"
+  - kind: call
+    pattern: "registerTool"
+  - kind: call
+    pattern: "addTool"
+  # FastMCP / NestMCP decorators
+  - kind: decorator
+    pattern: "tool"
+  - kind: decorator
+    pattern: "Tool"
+  - kind: decorator
+    pattern: "resource"
+  - kind: decorator
+    pattern: "prompt"
+
+sinks:
+  # Shell command execution — the headline MCP risk
+  - kind: call
+    pattern: "exec"
+    description: "child_process.exec — classic command injection"
+  - kind: call
+    pattern: "execSync"
+  - kind: call
+    pattern: "spawn"
+  - kind: call
+    pattern: "spawnSync"
+  - kind: call
+    pattern: "execFile"
+  - kind: call
+    pattern: "execFileSync"
+  - kind: call
+    pattern: "fork"
+  # Filesystem — directory traversal / arbitrary read-write
+  - kind: call
+    pattern: "fs.readFile"
+  - kind: call
+    pattern: "fs.readFileSync"
+  - kind: call
+    pattern: "fs.writeFile"
+  - kind: call
+    pattern: "fs.writeFileSync"
+  - kind: call
+    pattern: "fs.unlink"
+  - kind: call
+    pattern: "fs.unlinkSync"
+  - kind: call
+    pattern: "fs.rm"
+  - kind: call
+    pattern: "fs.rmSync"
+  - kind: call
+    pattern: "fs.appendFile"
+  - kind: call
+    pattern: "fs.createReadStream"
+  - kind: call
+    pattern: "fs.createWriteStream"
+  - kind: call
+    pattern: "readFile"
+  - kind: call
+    pattern: "writeFile"
+  # Network / SSRF
+  - kind: call
+    pattern: "fetch"
+  - kind: call
+    pattern: "axios.get"
+  - kind: call
+    pattern: "axios.post"
+  - kind: call
+    pattern: "axios.request"
+  - kind: call
+    pattern: "http.get"
+  - kind: call
+    pattern: "http.request"
+  - kind: call
+    pattern: "https.get"
+  - kind: call
+    pattern: "https.request"
+  # Eval / Function constructor (the extreme sinks)
+  - kind: call
+    pattern: "eval"
+  - kind: call
+    pattern: "Function"
+  - kind: call
+    pattern: "vm.runInContext"
+  - kind: call
+    pattern: "vm.runInNewContext"
+  # DB / SQL — most MCP servers don't do SQL but when they do it matters
+  - kind: call
+    pattern: "db.query"
+  - kind: call
+    pattern: "db.execute"
+
+sanitizers:
+  # Path validation patterns — most common MCP mitigation
+  - kind: call
+    pattern: "path.resolve"
+    description: "path.resolve against allowed root (common but weak alone)"
+  - kind: call
+    pattern: "path.normalize"
+  - kind: call
+    pattern: "isWithinRoot"
+  - kind: call
+    pattern: "isSubPath"
+  - kind: call
+    pattern: "assertSafePath"
+  - kind: call
+    pattern: "validatePath"
+  # URL / SSRF guards
+  - kind: call
+    pattern: "isPublicURL"
+  - kind: call
+    pattern: "isAllowedURL"
+  - kind: call
+    pattern: "validateURL"
+  # Command allow-list
+  - kind: call
+    pattern: "isAllowedCommand"
+  - kind: call
+    pattern: "assertSafeCommand"
+  # Zod/Joi schema validation (captures parsed-and-validated input)
+  - kind: call
+    pattern: "*.parse"
+    description: "zod/joi/pydantic parse with schema"
+  - kind: call
+    pattern: "*.safeParse"
+  # Explicit authz / policy
+  - kind: call
+    pattern: "checkPolicy"
+  - kind: call
+    pattern: "assertAllowed"
+
+sink_weights:
+  "exec": "high"
+  "execSync": "high"
+  "spawn": "high"
+  "spawnSync": "high"
+  "execFile": "high"
+  "fs.unlink": "high"
+  "fs.rm": "high"
+  "fs.writeFile": "high"
+  "fs.writeFileSync": "high"
+  "eval": "high"
+  "Function": "high"
+  "vm.runInContext": "high"
+  "fetch": "medium"
+  "axios.get": "medium"
+  "axios.post": "medium"
+  "http.get": "medium"
+  "fs.readFile": "medium"
+  "fs.createReadStream": "medium"
+  "db.query": "high"

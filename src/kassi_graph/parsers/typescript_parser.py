@@ -239,7 +239,11 @@ def _process_call(call: _TSNode, state: _FileState, graph: Graph) -> None:
         callsite=_loc(call, state.file),
     ))
 
-    # Handler-ref detection — `app.get("/", myHandler)` emits routes_to to myHandler.
+    # Handler-ref detection — covers two idioms:
+    #   (1) `app.get("/", myHandler)` — IDENTIFIER arg
+    #   (2) `server.tool("name", schema, async (args) => { ... })` — inline
+    #       arrow function or function expression as the LAST arg. Common in
+    #       MCP, Hono, Fastify handler definitions.
     arguments = call.child_by_field_name("arguments")
     if arguments is not None:
         for child in arguments.children:
@@ -260,6 +264,33 @@ def _process_call(call: _TSNode, state: _FileState, graph: Graph) -> None:
                     kind="routes_to",
                     callsite=_loc(call, state.file),
                 ))
+            elif child.type in ("arrow_function", "function_expression", "function"):
+                # Hoist inline handler into a synthetic named function so its
+                # body is traced. Name encodes call-site location for stability.
+                sp = child.start_point
+                row = sp[0] if isinstance(sp, tuple) else sp.row
+                synth_name = f"__inline_handler_{row + 1}"
+                qname = f"{state.module}.{synth_name}" if state.module else synth_name
+                handler_node = Node(
+                    id=_node_id(NodeKind.FUNCTION, qname),
+                    kind=NodeKind.FUNCTION,
+                    qualified_name=qname,
+                    short_name=synth_name,
+                    location=_loc(child, state.file),
+                )
+                graph.add_node(handler_node)
+                graph.add_edge(Edge(
+                    src=callee_node.id,
+                    dst=handler_node.id,
+                    kind="routes_to",
+                    callsite=_loc(call, state.file),
+                ))
+                # Walk the inline handler body as if it were a function.
+                body = child.child_by_field_name("body")
+                if body is not None:
+                    state.func_stack.append((qname, handler_node.id))
+                    _walk_body(body, state, graph)
+                    state.func_stack.pop()
 
 
 def _visit_root(root: _TSNode, state: _FileState, graph: Graph) -> None:
