@@ -172,16 +172,19 @@ def _reachable(
 
     while queue and len(results) < max_paths_per_source:
         item = queue.popleft()
-        state = (item.node_id, item.sanitized)
-        if state in visited_states:
-            continue
-        visited_states.add(state)
-
-        if len(item.path) > max_depth:
-            continue
-
         node = graph.nodes.get(item.node_id)
         if node is None:
+            continue
+        # Only dedup intermediate nodes. For sinks, each distinct path is a
+        # separate finding — different callers to the same sink are different
+        # bugs.
+        if node.role != sink_role:
+            state = (item.node_id, item.sanitized)
+            if state in visited_states:
+                continue
+            visited_states.add(state)
+
+        if len(item.path) > max_depth:
             continue
 
         # If this node is a sanitizer, mark path as sanitized and keep walking.

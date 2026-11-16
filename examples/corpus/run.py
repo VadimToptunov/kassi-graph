@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from kassi_graph.adapters.schema import Adapter
-from kassi_graph.parsers.python_parser import parse_codebase, resolve_short_name_edges
 from kassi_graph.reachability import unguarded_findings
 
 
@@ -25,6 +24,7 @@ class Case:
     expected_findings: set[str]   # short_names of functions expected to have a finding
     expected_clean: set[str]      # short_names of functions expected to be clean
     known_fps: set[str]           # short_names where tool may fire but it's intended-public
+    language: str = "python"      # "python" or "go"
 
 
 CASES = [
@@ -35,13 +35,34 @@ CASES = [
         expected_clean={"my_profile", "delete_user"},
         known_fps={"get_post"},
     ),
+    Case(
+        fixture="django_vulnerable",
+        adapter="django",
+        expected_findings={"leak_user_details", "edit_any_post"},
+        expected_clean={"safe_my_profile", "safe_delete_post", "admin_only_users_list"},
+        known_fps=set(),
+    ),
+    Case(
+        fixture="go_vulnerable",
+        adapter="go_http",
+        expected_findings={"UnguardedWrite", "UnguardedExec"},
+        expected_clean={"GuardedRead", "SafeSelfProfile"},
+        known_fps=set(),
+        language="go",
+    ),
 ]
 
 
 def run_case(case: Case, here: Path) -> tuple[int, int, int, int]:
     target = here / case.fixture
-    graph = parse_codebase(target)
-    resolve_short_name_edges(graph)
+    if case.language == "python":
+        from kassi_graph.parsers import python_parser as p
+    elif case.language == "go":
+        from kassi_graph.parsers import go_parser as p
+    else:
+        raise ValueError(case.language)
+    graph = p.parse_codebase(target)
+    p.resolve_short_name_edges(graph)
     adapter = Adapter.load(case.adapter)
     findings = unguarded_findings(graph, adapter, dedup=True)
 

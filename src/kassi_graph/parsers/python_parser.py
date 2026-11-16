@@ -167,6 +167,28 @@ class _Visitor(ast.NodeVisitor):
         self.generic_visit(node)
         self.s.class_stack.pop()
 
+    def _emit_routes_to_edges(self, src_id: str, call_node: ast.Call) -> None:
+        """For URL-registration calls like `path('/', my_view)`, create
+        routes_to edges from the call to any argument that is a bare Name.
+        The caller's URL pattern-matching will then propagate reachability.
+        """
+        for arg in list(call_node.args) + [kw.value for kw in call_node.keywords]:
+            if isinstance(arg, ast.Name):
+                handler_name = arg.id
+                target = Node(
+                    id=_node_id(NodeKind.FUNCTION, handler_name),
+                    kind=NodeKind.FUNCTION,
+                    qualified_name=handler_name,
+                    short_name=handler_name,
+                )
+                self.g.add_node(target)
+                self.g.add_edge(Edge(
+                    src=src_id,
+                    dst=target.id,
+                    kind="routes_to",
+                    callsite=self._loc(call_node),
+                ))
+
     def visit_Call(self, node: ast.Call) -> None:
         if not self.s.func_stack:
             # Module-level call (urlpatterns = [rest_path(...), ...]). We STILL
@@ -182,7 +204,10 @@ class _Visitor(ast.NodeVisitor):
                 location=self._loc(node),
             )
             self.g.add_node(callee_node)
-            # No containing function; call-site exists on its own.
+            # Scan call args for function-name identifiers. This captures
+            # Django's `path("url", view_func)` and Flask's `add_url_rule`
+            # style — the module-level registration call ROUTES TO the handler.
+            self._emit_routes_to_edges(callee_node.id, node)
         else:
             # Edge from containing function to the called NAME.
             qual = _get_call_qualified(node)
@@ -272,7 +297,7 @@ def resolve_short_name_edges(graph: Graph) -> None:
 
     rewrites = 0
     for edge in graph.edges:
-        if edge.kind != "calls":
+        if edge.kind not in ("calls", "routes_to"):
             continue
         dst_node = graph.nodes.get(edge.dst)
         if dst_node is None:

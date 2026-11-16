@@ -64,25 +64,43 @@ sinks:
     description: "S3 file serve"
 
 sanitizers:
-  # Generic Django authz patterns
-  - kind: decorator
-    pattern: "login_required"
-    description: "Django login_required"
+  # NOTE: @login_required is AUTHN, not AUTHZ. Removed by design — see
+  # flask.yaml for the same rationale. BOLA/IDOR hunters want to find
+  # authenticated-but-not-authorized paths.
+  #
+  # Real AUTHZ gates:
   - kind: decorator
     pattern: "permission_required"
-    description: "Django permission_required"
+    description: "Django permission_required (role/perm scoped)"
   - kind: decorator
     pattern: "user_passes_test"
-    description: "Django user_passes_test"
+    description: "Django user_passes_test (arbitrary predicate)"
   - kind: decorator
     pattern: "staff_member_required"
     description: "Django admin staff gate"
+  - kind: decorator
+    pattern: "require_admin"
+    description: "Project-local admin gate"
+  - kind: decorator
+    pattern: "require_realm_admin"
+    description: "Zulip-style realm admin gate"
+  - kind: decorator
+    pattern: "require_superuser"
   - kind: call
     pattern: "has_perm"
     description: "Django permission check"
   - kind: call
+    pattern: "has_permission"
+  - kind: call
     pattern: "get_object_or_404"
-    description: "Django filtered-fetch helper"
+    description: "Django filtered-fetch helper (usually filters to user-owned objects via kwargs)"
+  # Project-defined access helpers — generic convention access_X_by_id
+  - kind: call
+    pattern: "access_*"
+    description: "Project ownership helper access_*_by_id convention"
+  - kind: call
+    pattern: "check_can_*"
+    description: "check_can_X convention"
   - kind: call
     pattern: "assert"
     description: "Assertion (treat as gate)"
