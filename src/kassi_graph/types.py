@@ -80,13 +80,21 @@ class Edge:
 
 @dataclass
 class Graph:
-    """The unified graph produced by a parser."""
+    """The unified graph produced by a parser.
+
+    Adjacency indexes are built lazily on first lookup — this makes
+    graph construction O(1) per edge, and reachability O(1) per edge-lookup.
+    Any mutation to `edges` after lookup invalidates the index; call
+    `invalidate_index()`.
+    """
     nodes: dict[str, Node] = field(default_factory=dict)  # id → Node
     edges: list[Edge] = field(default_factory=list)
     language: str = ""
+    # lazy adjacency
+    _by_src: dict[str, list[Edge]] | None = field(default=None, repr=False)
+    _by_dst: dict[str, list[Edge]] | None = field(default=None, repr=False)
 
     def add_node(self, node: Node) -> None:
-        # If node already exists but new one is more specific (has location), keep new
         existing = self.nodes.get(node.id)
         if existing is None:
             self.nodes[node.id] = node
@@ -95,12 +103,33 @@ class Graph:
 
     def add_edge(self, edge: Edge) -> None:
         self.edges.append(edge)
+        self._by_src = None
+        self._by_dst = None
+
+    def invalidate_index(self) -> None:
+        self._by_src = None
+        self._by_dst = None
+
+    def _build_index(self) -> None:
+        by_src: dict[str, list[Edge]] = {}
+        by_dst: dict[str, list[Edge]] = {}
+        for e in self.edges:
+            by_src.setdefault(e.src, []).append(e)
+            by_dst.setdefault(e.dst, []).append(e)
+        self._by_src = by_src
+        self._by_dst = by_dst
 
     def outgoing(self, node_id: str) -> list[Edge]:
-        return [e for e in self.edges if e.src == node_id]
+        if self._by_src is None:
+            self._build_index()
+        assert self._by_src is not None
+        return self._by_src.get(node_id, [])
 
     def incoming(self, node_id: str) -> list[Edge]:
-        return [e for e in self.edges if e.dst == node_id]
+        if self._by_dst is None:
+            self._build_index()
+        assert self._by_dst is not None
+        return self._by_dst.get(node_id, [])
 
     def nodes_by_role(self, role: Role) -> list[Node]:
         return [n for n in self.nodes.values() if n.role == role]

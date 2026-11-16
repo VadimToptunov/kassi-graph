@@ -27,14 +27,26 @@ python3 -m venv .venv
 # Query: enumerate unguarded source→sink paths
 .venv/bin/kassi-graph query --adapter zulip --target /path/to/zulip/zerver
 
+# Go codebase (uses tree-sitter-go)
+.venv/bin/kassi-graph scan --target /path/to/mimir/pkg --language go
+.venv/bin/kassi-graph query --adapter go_http --target /path/to/mimir/pkg
+
 # Machine-readable
 .venv/bin/kassi-graph query --adapter zulip --target /path --json > findings.json
 
 # List available adapters
 .venv/bin/kassi-graph list-adapters
+# → django  fastapi  flask  go_http  net_http  zulip
 ```
 
-On a 204MB Zulip tree: ~1 second to parse, ~1 second to query. 13896 nodes, 33617 edges.
+## Perf
+
+| Codebase | Size | Nodes | Edges | Parse | Query |
+|---|---|---|---|---|---|
+| hunt-zulip (`zerver/`) | 204 MB | 13,896 | 33,617 | ~1 s | ~2 s |
+| hunt-mimir (`pkg/`, Go) | 248 MB | 30,641 | 93,160 | ~1.4 s | ~4.5 s |
+
+(Query time includes BFS over the full graph with adjacency-indexed outgoing edges.)
 
 ## Example output
 
@@ -107,9 +119,10 @@ kassi-graph query --adapter zulip --target . --json > findings.json
 
 | Phase | Deliverable | Status |
 |---|---|---|
-| 0 | Python stdlib `ast` parser + Django/Zulip adapters + reachability + CLI | ✅ done |
-| 1 | Flask + FastAPI adapters + test corpus (DVWA-equivalents) | pending |
-| 2 | Go parser (tree-sitter-go) + net/http + gin + chi adapters | pending |
+| 0 | Python stdlib `ast` parser + Django/Zulip adapters + reachability + CLI | ✅ shipped |
+| 1 | Flask + FastAPI adapters | ✅ shipped |
+| 2 | Go parser via tree-sitter-go + net/http, broad go_http adapter + 30x perf (adj-index) | ✅ shipped |
+| 2.5 | Test corpus (DVWA-equivalents known-vuln) for regression | pending |
 | 3 | TypeScript parser + Express + Fastify adapters | pending |
 | 4 | Plugin API — integrate into kassi-mcp-scanner first | pending |
 | 5 | Dynamic-dispatch resolver + inter-procedural dataflow | pending |

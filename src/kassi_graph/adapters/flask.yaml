@@ -1,0 +1,137 @@
+name: flask
+language: python
+version: "1.0"
+
+sources:
+  - kind: decorator
+    pattern: "route"
+    description: "@app.route / @blueprint.route"
+  - kind: decorator
+    pattern: "get"
+    description: "@app.get (Flask 2.x shortcut)"
+  - kind: decorator
+    pattern: "post"
+    description: "@app.post"
+  - kind: decorator
+    pattern: "put"
+    description: "@app.put"
+  - kind: decorator
+    pattern: "patch"
+    description: "@app.patch"
+  - kind: decorator
+    pattern: "delete"
+    description: "@app.delete"
+  - kind: decorator
+    pattern: "api.route"
+    description: "flask-restful @api.route"
+  - kind: decorator
+    pattern: "expose"
+    description: "flask-admin exposed view"
+  - kind: call
+    pattern: "add_url_rule"
+    description: "Programmatic URL registration"
+
+sinks:
+  # SQLAlchemy ORM
+  - kind: call
+    pattern: "*.query.filter"
+  - kind: call
+    pattern: "*.query.filter_by"
+  - kind: call
+    pattern: "*.query.get"
+  - kind: call
+    pattern: "*.query.first"
+  - kind: call
+    pattern: "*.query.all"
+  - kind: call
+    pattern: "db.session.add"
+  - kind: call
+    pattern: "db.session.commit"
+  - kind: call
+    pattern: "db.session.delete"
+  - kind: call
+    pattern: "session.execute"
+  # Raw SQL — these are HIGH severity because taint→SQLi
+  - kind: call
+    pattern: "execute"
+    description: "cursor.execute / connection.execute"
+  - kind: call
+    pattern: "executemany"
+  - kind: call
+    pattern: "text"
+    description: "SQLAlchemy text() — raw SQL construction"
+  # Response paths
+  - kind: call
+    pattern: "send_file"
+  - kind: call
+    pattern: "send_from_directory"
+  - kind: call
+    pattern: "render_template_string"
+    description: "SSTI-prone"
+  - kind: call
+    pattern: "jsonify"
+  # External calls
+  - kind: call
+    pattern: "requests.get"
+  - kind: call
+    pattern: "requests.post"
+  - kind: call
+    pattern: "urlopen"
+  - kind: call
+    pattern: "subprocess.run"
+  - kind: call
+    pattern: "subprocess.Popen"
+  - kind: call
+    pattern: "os.system"
+
+sanitizers:
+  # Flask-Login
+  - kind: decorator
+    pattern: "login_required"
+  - kind: decorator
+    pattern: "fresh_login_required"
+  # Flask-Principal / Flask-Security
+  - kind: decorator
+    pattern: "roles_required"
+  - kind: decorator
+    pattern: "permissions_required"
+  - kind: decorator
+    pattern: "auth_required"
+  - kind: decorator
+    pattern: "auth_token_required"
+  - kind: decorator
+    pattern: "http_auth_required"
+  # Decorators common in production
+  - kind: decorator
+    pattern: "jwt_required"
+    description: "flask-jwt-extended"
+  - kind: decorator
+    pattern: "api_key_required"
+  # Call-based gates
+  - kind: call
+    pattern: "verify_jwt_in_request"
+  - kind: call
+    pattern: "current_user.has_role"
+  - kind: call
+    pattern: "current_user.can"
+  - kind: call
+    pattern: "abort"
+    description: "flask.abort(403/401) — explicit deny"
+  # SQLAlchemy — parameterized queries treat the `.filter(Model.field == bindparam)` chain as sanitizing against SQLi
+  # (not against BOLA, which is why we don't remove them from the sinks list above)
+
+sink_weights:
+  "execute": "high"
+  "executemany": "high"
+  "text": "high"
+  "os.system": "high"
+  "subprocess.run": "high"
+  "subprocess.Popen": "high"
+  "render_template_string": "high"
+  "send_file": "medium"
+  "send_from_directory": "medium"
+  "db.session.delete": "high"
+  "db.session.commit": "medium"
+  "requests.get": "medium"
+  "requests.post": "medium"
+  "urlopen": "medium"

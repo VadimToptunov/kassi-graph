@@ -13,17 +13,20 @@ import sys
 from pathlib import Path
 
 from kassi_graph.adapters.schema import Adapter
-from kassi_graph.parsers.python_parser import parse_codebase, resolve_short_name_edges
 from kassi_graph.reachability import unguarded_findings
-from kassi_graph.types import Graph, Role
+from kassi_graph.types import Graph
 
 
 def _build_graph(target: Path, language: str) -> Graph:
-    if language != "python":
-        print(f"error: language '{language}' not supported in phase 0 (python-only)", file=sys.stderr)
+    if language == "python":
+        from kassi_graph.parsers import python_parser as p
+    elif language == "go":
+        from kassi_graph.parsers import go_parser as p
+    else:
+        print(f"error: language '{language}' not supported (python, go)", file=sys.stderr)
         sys.exit(2)
-    graph = parse_codebase(target)
-    resolve_short_name_edges(graph)
+    graph = p.parse_codebase(target)
+    p.resolve_short_name_edges(graph)
     return graph
 
 

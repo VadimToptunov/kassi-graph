@@ -1,0 +1,171 @@
+name: fastapi
+language: python
+version: "1.0"
+
+sources:
+  - kind: decorator
+    pattern: "get"
+    description: "@app.get / @router.get"
+  - kind: decorator
+    pattern: "post"
+  - kind: decorator
+    pattern: "put"
+  - kind: decorator
+    pattern: "patch"
+  - kind: decorator
+    pattern: "delete"
+  - kind: decorator
+    pattern: "head"
+  - kind: decorator
+    pattern: "options"
+  - kind: decorator
+    pattern: "websocket"
+    description: "@app.websocket"
+  - kind: decorator
+    pattern: "api_route"
+    description: "@router.api_route(methods=[...])"
+  - kind: call
+    pattern: "add_api_route"
+    description: "programmatic route registration"
+
+sinks:
+  # SQLAlchemy — same as Flask (FastAPI commonly uses SQLAlchemy)
+  - kind: call
+    pattern: "*.query.filter"
+  - kind: call
+    pattern: "*.query.get"
+  - kind: call
+    pattern: "db.session.add"
+  - kind: call
+    pattern: "db.session.commit"
+  - kind: call
+    pattern: "db.session.delete"
+  - kind: call
+    pattern: "session.execute"
+  # Direct SQL via databases / SQLAlchemy async
+  - kind: call
+    pattern: "execute"
+  - kind: call
+    pattern: "fetch_one"
+  - kind: call
+    pattern: "fetch_all"
+  - kind: call
+    pattern: "text"
+  # ORM Alternatives — Tortoise / SQLModel / Beanie (MongoDB)
+  - kind: call
+    pattern: "*.filter"
+  - kind: call
+    pattern: "*.get"
+  - kind: call
+    pattern: "*.save"
+  - kind: call
+    pattern: "*.delete"
+  - kind: call
+    pattern: "*.insert_one"
+  - kind: call
+    pattern: "*.find_one"
+  - kind: call
+    pattern: "*.update_one"
+  # Response + file
+  - kind: call
+    pattern: "FileResponse"
+  - kind: call
+    pattern: "StreamingResponse"
+  - kind: call
+    pattern: "RedirectResponse"
+    description: "potential open-redirect"
+  - kind: call
+    pattern: "JSONResponse"
+  - kind: call
+    pattern: "HTMLResponse"
+    description: "XSS-prone"
+  # External calls
+  - kind: call
+    pattern: "httpx.get"
+  - kind: call
+    pattern: "httpx.post"
+  - kind: call
+    pattern: "requests.get"
+  - kind: call
+    pattern: "requests.post"
+  - kind: call
+    pattern: "urlopen"
+  - kind: call
+    pattern: "subprocess.run"
+  - kind: call
+    pattern: "subprocess.Popen"
+  - kind: call
+    pattern: "os.system"
+
+sanitizers:
+  # FastAPI Depends — the canonical sanitizer pattern
+  - kind: call
+    pattern: "Depends"
+    description: "FastAPI dependency injection — can be authz"
+  - kind: call
+    pattern: "Security"
+    description: "FastAPI Security dependency (scoped)"
+  # Common auth patterns
+  - kind: call
+    pattern: "get_current_user"
+  - kind: call
+    pattern: "get_current_active_user"
+  - kind: call
+    pattern: "get_current_superuser"
+  - kind: call
+    pattern: "require_user"
+  - kind: call
+    pattern: "require_auth"
+  - kind: call
+    pattern: "verify_token"
+  - kind: call
+    pattern: "verify_scope"
+  # Starlette level
+  - kind: call
+    pattern: "AuthenticationBackend"
+  # Explicit deny
+  - kind: call
+    pattern: "HTTPException"
+    description: "explicit HTTP 401/403 raise"
+  # Role-check patterns in code
+  - kind: call
+    pattern: "has_role"
+  - kind: call
+    pattern: "has_permission"
+  - kind: call
+    pattern: "check_permissions"
+  - kind: call
+    pattern: "check_authorized"
+  # Class dependencies (FastAPI OAuth2PasswordBearer, OAuth2PasswordRequestForm are declarative)
+  - kind: call
+    pattern: "OAuth2PasswordBearer"
+  - kind: call
+    pattern: "OAuth2AuthorizationCodeBearer"
+  - kind: call
+    pattern: "HTTPBearer"
+  - kind: call
+    pattern: "HTTPBasic"
+  - kind: call
+    pattern: "APIKeyHeader"
+  - kind: call
+    pattern: "APIKeyQuery"
+  - kind: call
+    pattern: "APIKeyCookie"
+
+sink_weights:
+  "execute": "high"
+  "text": "high"
+  "os.system": "high"
+  "subprocess.run": "high"
+  "subprocess.Popen": "high"
+  "HTMLResponse": "high"
+  "RedirectResponse": "medium"
+  "FileResponse": "medium"
+  "StreamingResponse": "medium"
+  "*.delete": "high"
+  "*.update_one": "high"
+  "db.session.delete": "high"
+  "httpx.get": "medium"
+  "httpx.post": "medium"
+  "requests.get": "medium"
+  "urlopen": "medium"

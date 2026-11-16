@@ -1,0 +1,148 @@
+name: net_http
+language: go
+version: "1.0"
+
+# Adapter for Go net/http (stdlib) + database/sql + common patterns.
+
+sources:
+  # Handler registration via stdlib net/http
+  - kind: call
+    pattern: "http.HandleFunc"
+    description: "stdlib HTTP handler registration"
+  - kind: call
+    pattern: "http.Handle"
+    description: "stdlib HTTP handler registration"
+  - kind: call
+    pattern: "mux.HandleFunc"
+    description: "custom mux HandleFunc"
+  - kind: call
+    pattern: "mux.Handle"
+    description: "custom mux Handle"
+  - kind: call
+    pattern: "mux.Methods"
+    description: "gorilla/mux methods"
+
+sinks:
+  # database/sql
+  - kind: call
+    pattern: "db.Exec"
+    description: "raw SQL exec (SQLi-prone)"
+  - kind: call
+    pattern: "db.Query"
+    description: "raw SQL query (SQLi-prone)"
+  - kind: call
+    pattern: "db.QueryRow"
+  - kind: call
+    pattern: "tx.Exec"
+  - kind: call
+    pattern: "tx.Query"
+  - kind: call
+    pattern: "tx.QueryRow"
+  # Bare "Exec"/"Query" removed: too broad (matches r.URL.Query etc). Use
+  # qualified patterns above or add project-specific ones per adapter.
+  # gorm / sqlx / ent
+  - kind: call
+    pattern: "*.Find"
+  - kind: call
+    pattern: "*.First"
+  - kind: call
+    pattern: "*.Save"
+  - kind: call
+    pattern: "*.Create"
+  - kind: call
+    pattern: "*.Update"
+  - kind: call
+    pattern: "*.Delete"
+  - kind: call
+    pattern: "*.Where"
+  # File / path
+  - kind: call
+    pattern: "os.Open"
+  - kind: call
+    pattern: "ioutil.ReadFile"
+  - kind: call
+    pattern: "os.ReadFile"
+  - kind: call
+    pattern: "http.ServeFile"
+  - kind: call
+    pattern: "http.ServeContent"
+  # Command execution
+  - kind: call
+    pattern: "exec.Command"
+  - kind: call
+    pattern: "exec.CommandContext"
+  # External calls (SSRF)
+  - kind: call
+    pattern: "http.Get"
+  - kind: call
+    pattern: "http.Post"
+  - kind: call
+    pattern: "client.Get"
+  - kind: call
+    pattern: "client.Post"
+  - kind: call
+    pattern: "client.Do"
+  - kind: call
+    pattern: "http.Client.Do"
+
+sanitizers:
+  # Common Go authz patterns
+  - kind: call
+    pattern: "CheckAccess"
+  - kind: call
+    pattern: "checkAccess"
+  - kind: call
+    pattern: "Authorize"
+  - kind: call
+    pattern: "authorize"
+  - kind: call
+    pattern: "IsAuthorized"
+  - kind: call
+    pattern: "HasPermission"
+  - kind: call
+    pattern: "RequireAuth"
+  - kind: call
+    pattern: "RequireUser"
+  - kind: call
+    pattern: "RequireRole"
+  - kind: call
+    pattern: "VerifyJWT"
+  - kind: call
+    pattern: "ValidateToken"
+  - kind: call
+    pattern: "GetUserFromContext"
+  - kind: call
+    pattern: "GetCurrentUser"
+  # Middleware recognizers — Go idiom is wrapping handlers
+  - kind: call
+    pattern: "AuthMiddleware"
+  - kind: call
+    pattern: "BasicAuthMiddleware"
+  - kind: call
+    pattern: "JWTMiddleware"
+  # Explicit denies
+  - kind: call
+    pattern: "http.Error"
+    description: "http.Error 401/403 as explicit deny"
+  - kind: call
+    pattern: "Forbidden"
+  - kind: call
+    pattern: "Unauthorized"
+
+sink_weights:
+  "db.Exec": "high"
+  "db.Query": "high"
+  "tx.Exec": "high"
+  "tx.Query": "high"
+  "Exec": "high"
+  "Query": "high"
+  "exec.Command": "high"
+  "exec.CommandContext": "high"
+  "*.Delete": "high"
+  "*.Update": "high"
+  "http.ServeFile": "medium"
+  "os.Open": "medium"
+  "os.ReadFile": "medium"
+  "http.Get": "medium"
+  "http.Post": "medium"
+  "client.Do": "medium"

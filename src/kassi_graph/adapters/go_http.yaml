@@ -1,0 +1,244 @@
+name: go_http
+language: go
+version: "1.0"
+
+# Broad Go HTTP adapter — net/http stdlib + gorilla/mux + chi + gin + fiber +
+# echo + custom-router common patterns. For a project-specific adapter,
+# override or extend with the project's own sanitizers/sinks.
+
+sources:
+  # net/http
+  - kind: call
+    pattern: "http.HandleFunc"
+  - kind: call
+    pattern: "http.Handle"
+  - kind: call
+    pattern: "mux.HandleFunc"
+  - kind: call
+    pattern: "mux.Handle"
+  # gorilla/mux
+  - kind: call
+    pattern: "*.HandleFunc"
+    description: "generic HandleFunc on any router (gorilla/mux, custom)"
+  - kind: call
+    pattern: "*.Handle"
+    description: "generic Handle"
+  - kind: call
+    pattern: "*.Methods"
+    description: "gorilla/mux Methods chain"
+  # chi (go-chi/chi)
+  - kind: call
+    pattern: "*.Get"
+  - kind: call
+    pattern: "*.Post"
+  - kind: call
+    pattern: "*.Put"
+  - kind: call
+    pattern: "*.Patch"
+  - kind: call
+    pattern: "*.Delete"
+  - kind: call
+    pattern: "*.Head"
+  - kind: call
+    pattern: "*.Options"
+  # gin-gonic (gin)
+  - kind: call
+    pattern: "*.GET"
+  - kind: call
+    pattern: "*.POST"
+  - kind: call
+    pattern: "*.PUT"
+  - kind: call
+    pattern: "*.PATCH"
+  - kind: call
+    pattern: "*.DELETE"
+  - kind: call
+    pattern: "*.HEAD"
+  - kind: call
+    pattern: "*.OPTIONS"
+  # prometheus-common / weaveworks/common
+  - kind: call
+    pattern: "*.Path"
+    description: "prometheus Route builder .Path(path)"
+  - kind: call
+    pattern: "*.Route"
+  # echo
+  - kind: call
+    pattern: "*.GET"
+  # fiber
+  - kind: call
+    pattern: "*.All"
+
+sinks:
+  # database/sql
+  - kind: call
+    pattern: "db.Exec"
+  - kind: call
+    pattern: "db.Query"
+  - kind: call
+    pattern: "db.QueryRow"
+  - kind: call
+    pattern: "tx.Exec"
+  - kind: call
+    pattern: "tx.Query"
+  - kind: call
+    pattern: "tx.QueryRow"
+  # Common library-of-services calls
+  - kind: call
+    pattern: "*.PutObject"
+    description: "object storage write"
+  - kind: call
+    pattern: "*.GetObject"
+    description: "object storage read"
+  - kind: call
+    pattern: "*.DeleteObject"
+  - kind: call
+    pattern: "*.ListObjects"
+  # Writes to time-series ingester (Mimir/Loki/Tempo-specific)
+  - kind: call
+    pattern: "*.Push"
+    description: "ingestion write path (Mimir/Loki/Tempo)"
+  - kind: call
+    pattern: "*.Ingest"
+  - kind: call
+    pattern: "*.Append"
+  - kind: call
+    pattern: "*.Commit"
+  - kind: call
+    pattern: "*.Flush"
+  # ORM — gorm, ent, sqlx
+  - kind: call
+    pattern: "*.First"
+  - kind: call
+    pattern: "*.Find"
+  - kind: call
+    pattern: "*.Save"
+  - kind: call
+    pattern: "*.Create"
+  - kind: call
+    pattern: "*.Update"
+  - kind: call
+    pattern: "*.Updates"
+  - kind: call
+    pattern: "*.Delete"
+  - kind: call
+    pattern: "*.Where"
+  # File I/O
+  - kind: call
+    pattern: "os.Open"
+  - kind: call
+    pattern: "os.ReadFile"
+  - kind: call
+    pattern: "ioutil.ReadFile"
+  - kind: call
+    pattern: "http.ServeFile"
+  - kind: call
+    pattern: "http.ServeContent"
+  # Command exec
+  - kind: call
+    pattern: "exec.Command"
+  - kind: call
+    pattern: "exec.CommandContext"
+  # External calls (SSRF surface)
+  - kind: call
+    pattern: "http.Get"
+  - kind: call
+    pattern: "http.Post"
+  - kind: call
+    pattern: "http.DefaultClient.*"
+  - kind: call
+    pattern: "client.Do"
+
+sanitizers:
+  # Generic authz / validation patterns
+  - kind: call
+    pattern: "CheckAccess"
+  - kind: call
+    pattern: "checkAccess"
+  - kind: call
+    pattern: "Authorize"
+  - kind: call
+    pattern: "authorize"
+  - kind: call
+    pattern: "IsAuthorized"
+  - kind: call
+    pattern: "HasPermission"
+  - kind: call
+    pattern: "HasAccess"
+  - kind: call
+    pattern: "AuthenticateRequest"
+  - kind: call
+    pattern: "RequireAuth"
+  - kind: call
+    pattern: "RequireUser"
+  - kind: call
+    pattern: "RequireRole"
+  - kind: call
+    pattern: "VerifyJWT"
+  - kind: call
+    pattern: "VerifyToken"
+  - kind: call
+    pattern: "ValidateToken"
+  - kind: call
+    pattern: "GetUserFromContext"
+  - kind: call
+    pattern: "GetCurrentUser"
+  - kind: call
+    pattern: "UserFromContext"
+  # Middleware-wrappers (Go idiom)
+  - kind: call
+    pattern: "AuthMiddleware"
+  - kind: call
+    pattern: "AuthMiddleware.*"
+  - kind: call
+    pattern: "BasicAuthMiddleware"
+  - kind: call
+    pattern: "JWTMiddleware"
+  - kind: call
+    pattern: "*.Middleware"
+    description: "generic middleware wrapper"
+  # Explicit per-tenant checks (Mimir/Loki/Tempo-specific)
+  - kind: call
+    pattern: "ExtractTenantID"
+  - kind: call
+    pattern: "ExtractTenantIDs"
+  - kind: call
+    pattern: "TenantID"
+    description: "Mimir/Loki — fetch tenant ID from context"
+  - kind: call
+    pattern: "RequireUnmarshaler"
+  - kind: call
+    pattern: "limits.*"
+    description: "limits check (Mimir pattern)"
+  # Explicit deny
+  - kind: call
+    pattern: "http.Error"
+  - kind: call
+    pattern: "Forbidden"
+  - kind: call
+    pattern: "Unauthorized"
+  - kind: call
+    pattern: "AbortWithStatus"
+    description: "gin abort"
+
+sink_weights:
+  "db.Exec": "high"
+  "db.Query": "high"
+  "tx.Exec": "high"
+  "tx.Query": "high"
+  "exec.Command": "high"
+  "exec.CommandContext": "high"
+  "*.Delete": "high"
+  "*.DeleteObject": "high"
+  "*.Push": "high"
+  "*.Ingest": "high"
+  "*.Append": "medium"
+  "*.Save": "medium"
+  "*.Create": "medium"
+  "*.Update": "medium"
+  "http.ServeFile": "medium"
+  "os.Open": "medium"
+  "os.ReadFile": "medium"
+  "http.Get": "medium"
+  "http.Post": "medium"
+  "client.Do": "medium"
