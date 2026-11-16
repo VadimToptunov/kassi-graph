@@ -1,0 +1,100 @@
+name: django
+language: python
+version: "1.0"
+
+sources:
+  - kind: decorator
+    pattern: "typed_endpoint"
+    description: "Django typed-endpoint-decorated view"
+  - kind: decorator
+    pattern: "typed_endpoint_without_parameters"
+    description: "Django parameterless typed endpoint"
+  - kind: decorator
+    pattern: "api_view"
+    description: "DRF api_view decorator"
+  - kind: decorator
+    pattern: "csrf_exempt"
+    description: "CSRF-exempt view (often public-ish API)"
+  - kind: call
+    pattern: "rest_path"
+    description: "URL pattern registration"
+  - kind: call
+    pattern: "re_path"
+    description: "URL pattern registration (regex)"
+  - kind: call
+    pattern: "path"
+    description: "URL pattern registration (django.urls.path)"
+
+sinks:
+  - kind: call
+    pattern: "*.objects.get"
+    description: "ORM get"
+  - kind: call
+    pattern: "*.objects.filter"
+    description: "ORM filter"
+  - kind: call
+    pattern: "*.objects.all"
+    description: "ORM all"
+  - kind: call
+    pattern: "*.objects.save"
+    description: "ORM save"
+  - kind: call
+    pattern: "*.objects.update"
+    description: "ORM update"
+  - kind: call
+    pattern: "*.objects.delete"
+    description: "ORM delete"
+  - kind: call
+    pattern: "*.objects.create"
+    description: "ORM create"
+  - kind: call
+    pattern: "*.objects.bulk_create"
+    description: "ORM bulk_create"
+  - kind: call
+    pattern: "FileResponse"
+    description: "File serve"
+  - kind: call
+    pattern: "HttpResponse"
+    description: "HTTP response"
+  - kind: call
+    pattern: "serve_local"
+    description: "Local file serve"
+  - kind: call
+    pattern: "serve_s3"
+    description: "S3 file serve"
+
+sanitizers:
+  # Generic Django authz patterns
+  - kind: decorator
+    pattern: "login_required"
+    description: "Django login_required"
+  - kind: decorator
+    pattern: "permission_required"
+    description: "Django permission_required"
+  - kind: decorator
+    pattern: "user_passes_test"
+    description: "Django user_passes_test"
+  - kind: decorator
+    pattern: "staff_member_required"
+    description: "Django admin staff gate"
+  - kind: call
+    pattern: "has_perm"
+    description: "Django permission check"
+  - kind: call
+    pattern: "get_object_or_404"
+    description: "Django filtered-fetch helper"
+  - kind: call
+    pattern: "assert"
+    description: "Assertion (treat as gate)"
+
+sink_weights:
+  "*.objects.delete": "high"
+  "*.objects.update": "high"
+  "*.objects.save": "medium"
+  "*.objects.bulk_create": "medium"
+  "*.objects.create": "medium"
+  "*.objects.get": "low"
+  "*.objects.filter": "low"
+  "*.objects.all": "low"
+  "FileResponse": "medium"
+  "HttpResponse": "low"

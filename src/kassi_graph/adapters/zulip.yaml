@@ -1,0 +1,169 @@
+name: zulip
+language: python
+version: "1.0"
+
+# Zulip-specialized Django adapter. Codifies the chokepoint architecture
+# that my 2026-11-16 static audit discovered.
+
+sources:
+  # Zulip typed-endpoint decorators
+  - kind: decorator
+    pattern: "typed_endpoint"
+    description: "Zulip typed API endpoint"
+  - kind: decorator
+    pattern: "typed_endpoint_without_parameters"
+    description: "Zulip parameterless typed endpoint"
+  - kind: decorator
+    pattern: "authenticated_json_view"
+    description: "Zulip auth-required JSON view (still a source — authn ≠ authz)"
+  - kind: decorator
+    pattern: "authenticated_rest_api_view"
+    description: "Zulip auth-required REST view"
+  - kind: decorator
+    pattern: "webhook_view"
+    description: "Zulip webhook entrypoint"
+  - kind: decorator
+    pattern: "draft_endpoint"
+    description: "Zulip draft-sync wrapper"
+  - kind: call
+    pattern: "rest_path"
+    description: "URL pattern registration"
+  # Flag anonymously-accessible endpoints explicitly — these are the HOT spots
+  - kind: call
+    pattern: "rest_path_with_flags"
+    description: "URL pattern with allow_anonymous_user_web flag"
+
+sinks:
+  # ORM touches (narrow to Zulip-specific models where helpful)
+  - kind: call
+    pattern: "*.objects.get"
+  - kind: call
+    pattern: "*.objects.filter"
+  - kind: call
+    pattern: "*.objects.save"
+  - kind: call
+    pattern: "*.objects.update"
+  - kind: call
+    pattern: "*.objects.delete"
+  - kind: call
+    pattern: "*.objects.create"
+  - kind: call
+    pattern: "*.objects.bulk_create"
+  # Zulip-specific sinks
+  - kind: call
+    pattern: "send_event_on_commit"
+    description: "Tornado event broadcast"
+  - kind: call
+    pattern: "do_send_event"
+    description: "Tornado direct event dispatch"
+  - kind: call
+    pattern: "serve_local"
+    description: "Local-file serve"
+  - kind: call
+    pattern: "serve_s3"
+    description: "S3 file serve (signed URL)"
+  - kind: call
+    pattern: "do_claim_attachments"
+    description: "Attachment reference change"
+  - kind: call
+    pattern: "do_schedule_messages"
+    description: "Schedule message write"
+  - kind: call
+    pattern: "notify_*"
+    description: "Zulip notify_* broadcast"
+
+sanitizers:
+  # Zulip access_*_by_id and access_* family — the canonical chokepoints
+  - kind: call
+    pattern: "access_message"
+  - kind: call
+    pattern: "access_message_and_usermessage"
+  - kind: call
+    pattern: "access_web_public_message"
+  - kind: call
+    pattern: "access_stream_by_id"
+  - kind: call
+    pattern: "access_stream_by_name"
+  - kind: call
+    pattern: "access_stream_common"
+  - kind: call
+    pattern: "access_stream_for_send_message"
+  - kind: call
+    pattern: "access_stream_for_delete_or_update_requiring_metadata_access"
+  - kind: call
+    pattern: "access_web_public_stream"
+  - kind: call
+    pattern: "access_stream_to_remove_visibility_policy_by_id"
+  - kind: call
+    pattern: "access_stream_to_remove_visibility_policy_by_name"
+  - kind: call
+    pattern: "access_requested_group_permissions_for_streams"
+  - kind: call
+    pattern: "access_default_stream_group_by_id"
+  - kind: call
+    pattern: "access_user_by_id"
+  - kind: call
+    pattern: "access_user_by_id_including_cross_realm"
+  - kind: call
+    pattern: "access_user_by_email"
+  - kind: call
+    pattern: "access_user_common"
+  - kind: call
+    pattern: "access_bot_by_id"
+  - kind: call
+    pattern: "access_attachment_by_id"
+  - kind: call
+    pattern: "access_scheduled_message"
+  - kind: call
+    pattern: "access_reminder"
+  - kind: call
+    pattern: "access_user_group_to_read_membership"
+  - kind: call
+    pattern: "access_user_group_for_update"
+  - kind: call
+    pattern: "access_user_group_for_deactivation"
+  - kind: call
+    pattern: "access_user_group_api_value_for_setting"
+  - kind: call
+    pattern: "access_user_group_for_setting"
+  - kind: call
+    pattern: "access_narrow"
+  # Explicit check_* helpers
+  - kind: call
+    pattern: "check_sender_can_access_recipients"
+  - kind: call
+    pattern: "check_can_send_direct_message"
+  - kind: call
+    pattern: "check_can_access_user"
+  - kind: call
+    pattern: "check_user_can_access_all_users"
+  - kind: call
+    pattern: "check_schedule_message"
+  - kind: call
+    pattern: "check_message"
+  - kind: call
+    pattern: "validate_attachment_request"
+  - kind: call
+    pattern: "validate_attachment_request_for_spectator_access"
+  # Role decorators
+  - kind: decorator
+    pattern: "require_realm_admin"
+  - kind: decorator
+    pattern: "require_member_or_admin"
+  - kind: decorator
+    pattern: "require_billing_access"
+  - kind: decorator
+    pattern: "human_users_only"
+  # Explicit "spectator is gated" asserts
+  - kind: call
+    pattern: "MissingAuthenticationError"
+    description: "Raised when spectator forbidden"
+
+sink_weights:
+  "*.objects.delete": "high"
+  "*.objects.update": "high"
+  "*.objects.save": "medium"
+  "send_event_on_commit": "medium"
+  "serve_s3": "high"
+  "serve_local": "high"
+  "do_claim_attachments": "high"
