@@ -68,8 +68,9 @@ sinks:
   - kind: call
     pattern: "render_template_string"
     description: "SSTI-prone"
-  - kind: call
-    pattern: "jsonify"
+  # jsonify intentionally excluded: it's response framing, not a vulnerability
+  # sink. Hunters care about what data reaches the response, which is captured
+  # by ORM-touch sinks above. Including jsonify explodes the noise floor.
   # External calls
   - kind: call
     pattern: "requests.get"
@@ -85,11 +86,14 @@ sinks:
     pattern: "os.system"
 
 sanitizers:
-  # Flask-Login
-  - kind: decorator
-    pattern: "login_required"
-  - kind: decorator
-    pattern: "fresh_login_required"
+  # NOTE on Flask-Login decorators:
+  # @login_required and @fresh_login_required are AUTHENTICATION, NOT
+  # authorization. They filter anonymous users but do not check object
+  # ownership or permissions. We deliberately DO NOT list them as sanitizers
+  # here because the whole point of BOLA/IDOR hunting is to find
+  # authenticated-but-unauthorized paths. Users who want "catch authn
+  # missing" as a separate audit should use a different adapter.
+  #
   # Flask-Principal / Flask-Security
   - kind: decorator
     pattern: "roles_required"

@@ -214,10 +214,25 @@ def _reachable(
 
 
 def unguarded_findings(
-    graph: Graph, adapter: Adapter, *, max_depth: int = 8, max_paths_per_source: int = 20
+    graph: Graph, adapter: Adapter, *,
+    max_depth: int = 8,
+    max_paths_per_source: int = 20,
+    exclude_path_substrings: list[str] | None = None,
+    dedup: bool = True,
 ) -> list[Finding]:
-    """Label graph then enumerate unguarded source→sink paths."""
+    """Label graph then enumerate unguarded source→sink paths.
+
+    `exclude_path_substrings`: filter out findings whose source OR sink
+    location contains any of these substrings. Use to drop pre-auth flows,
+    test fixtures, vendored code, etc.
+
+    `dedup`: when True (default), collapse findings that share the same
+    (anchor_function, sink_location) key — picks the shortest path as the
+    canonical representation. This removes the typical "decorator vs
+    function" double-reporting.
+    """
     label_graph(graph, adapter)
+    excludes = exclude_path_substrings or []
     findings: list[Finding] = []
     for source in graph.nodes_by_role(Role.SOURCE):
         for sink_id, path in _reachable(
@@ -243,11 +258,46 @@ def unguarded_findings(
                 outs = [e for e in graph.outgoing(a) if e.dst == b]
                 if outs:
                     edges.append(outs[0])
-            findings.append(Finding(
+            fnd = Finding(
                 source_node=source,
                 sink_node=sink,
                 path=Path(nodes=list(path), edges=edges, confidence=conf),
                 severity_hint=sev,
                 why=f"{source.short_name} → … → {sink.short_name}; no sanitizer on this path",
-            ))
+            )
+            # Exclude filter: drop if source OR sink location contains any
+            # of the user-supplied substrings. Useful for pre-auth flows,
+            # test fixtures, vendored code, generated code.
+            if excludes:
+                src_loc = str(source.location) if source.location else ""
+                sink_loc = str(sink.location) if sink.location else ""
+                if any(ex in src_loc or ex in sink_loc for ex in excludes):
+                    continue
+            findings.append(fnd)
+
+    if dedup and findings:
+        # Collapse: (anchor_function, sink_file:sink_line) → shortest path.
+        # The "anchor function" is the innermost non-decorator FUNCTION node
+        # on the source side — resolves the "decorator view vs function view"
+        # double-reporting.
+        def _anchor(f: Finding) -> str:
+            # Walk the path from source; first FUNCTION node WITH a location is the anchor.
+            for nid in f.path.nodes:
+                n = graph.nodes.get(nid)
+                if n is not None and n.kind == NodeKind.FUNCTION and n.location is not None:
+                    return n.qualified_name
+            return f.source_node.qualified_name
+
+        def _key(f: Finding) -> tuple[str, str]:
+            sink_loc = str(f.sink_node.location) if f.sink_node.location else f.sink_node.qualified_name
+            return (_anchor(f), sink_loc)
+
+        best: dict[tuple[str, str], Finding] = {}
+        for f in findings:
+            k = _key(f)
+            cur = best.get(k)
+            if cur is None or f.path.length < cur.path.length:
+                best[k] = f
+        findings = list(best.values())
+
     return findings

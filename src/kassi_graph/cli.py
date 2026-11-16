@@ -52,6 +52,8 @@ def cmd_query(args: argparse.Namespace) -> int:
         graph, adapter,
         max_depth=args.max_depth,
         max_paths_per_source=args.max_paths_per_source,
+        exclude_path_substrings=args.exclude,
+        dedup=not args.no_dedup,
     )
 
     # Rank: by severity_hint (high > medium > low), then confidence (high > med > low)
@@ -62,6 +64,11 @@ def cmd_query(args: argparse.Namespace) -> int:
     if args.limit > 0:
         findings = findings[: args.limit]
 
+    if args.html:
+        from kassi_graph.report import write_html
+        write_html(args.html, target=str(target), adapter=args.adapter, graph=graph, findings=findings)
+        print(f"wrote HTML report → {args.html} ({len(findings)} findings)", file=sys.stderr)
+
     if args.json:
         print(json.dumps({
             "target": str(target),
@@ -69,6 +76,9 @@ def cmd_query(args: argparse.Namespace) -> int:
             "stats": graph.stats(),
             "findings": [f.to_dict() for f in findings],
         }, indent=2))
+    elif args.html:
+        # html already emitted a one-line status to stderr; nothing more needed on stdout
+        pass
     else:
         print(f"Target: {target}")
         print(f"Adapter: {adapter.name} ({adapter.language})")
@@ -114,9 +124,14 @@ def main(argv: list[str] | None = None) -> int:
     p_query.add_argument("--adapter", required=True, help="name (django/zulip/...) or path to YAML")
     p_query.add_argument("--target", required=True)
     p_query.add_argument("--json", action="store_true")
+    p_query.add_argument("--html", metavar="PATH", help="write HTML report to this path")
     p_query.add_argument("--max-depth", type=int, default=8)
     p_query.add_argument("--max-paths-per-source", type=int, default=20)
     p_query.add_argument("--limit", type=int, default=0, help="cap output to first N findings")
+    p_query.add_argument("--exclude", action="append", default=[], metavar="SUBSTR",
+                         help="drop findings whose source or sink location contains SUBSTR; can repeat")
+    p_query.add_argument("--no-dedup", action="store_true",
+                         help="disable finding deduplication (default: dedup by anchor-function+sink-location)")
     p_query.set_defaults(func=cmd_query)
 
     p_ls = sub.add_parser("list-adapters", help="list bundled adapters")
