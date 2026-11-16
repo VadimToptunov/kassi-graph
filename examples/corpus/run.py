@@ -50,6 +50,16 @@ CASES = [
         known_fps=set(),
         language="go",
     ),
+    Case(
+        fixture="express_vulnerable",
+        adapter="express",
+        expected_findings={"getUserDetails", "deleteAnyPost"},
+        expected_clean={"safeDeleteComment"},
+        # safeMyProfile uses req.session.userId — engine can't tell this is
+        # auth-derived without taint tracking; conservative FP by design.
+        known_fps={"safeMyProfile"},
+        language="typescript",
+    ),
 ]
 
 
@@ -59,6 +69,8 @@ def run_case(case: Case, here: Path) -> tuple[int, int, int, int]:
         from kassi_graph.parsers import python_parser as p
     elif case.language == "go":
         from kassi_graph.parsers import go_parser as p
+    elif case.language in ("typescript", "javascript"):
+        from kassi_graph.parsers import typescript_parser as p
     else:
         raise ValueError(case.language)
     graph = p.parse_codebase(target)

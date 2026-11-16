@@ -22,8 +22,10 @@ def _build_graph(target: Path, language: str) -> Graph:
         from kassi_graph.parsers import python_parser as p
     elif language == "go":
         from kassi_graph.parsers import go_parser as p
+    elif language in ("typescript", "javascript", "ts", "js"):
+        from kassi_graph.parsers import typescript_parser as p
     else:
-        print(f"error: language '{language}' not supported (python, go)", file=sys.stderr)
+        print(f"error: language '{language}' not supported (python, go, typescript)", file=sys.stderr)
         sys.exit(2)
     graph = p.parse_codebase(target)
     p.resolve_short_name_edges(graph)

@@ -1,0 +1,155 @@
+name: express
+language: typescript
+version: "1.0"
+
+sources:
+  - kind: call
+    pattern: "app.get"
+  - kind: call
+    pattern: "app.post"
+  - kind: call
+    pattern: "app.put"
+  - kind: call
+    pattern: "app.patch"
+  - kind: call
+    pattern: "app.delete"
+  - kind: call
+    pattern: "app.all"
+  - kind: call
+    pattern: "app.use"
+    description: "Express middleware mount (often routes)"
+  - kind: call
+    pattern: "router.get"
+  - kind: call
+    pattern: "router.post"
+  - kind: call
+    pattern: "router.put"
+  - kind: call
+    pattern: "router.patch"
+  - kind: call
+    pattern: "router.delete"
+  - kind: call
+    pattern: "router.all"
+  - kind: call
+    pattern: "router.use"
+
+sinks:
+  # ORM / DB
+  - kind: call
+    pattern: "db.query"
+  - kind: call
+    pattern: "db.execute"
+  - kind: call
+    pattern: "pool.query"
+  - kind: call
+    pattern: "conn.query"
+  - kind: call
+    pattern: "client.query"
+  # Prisma
+  - kind: call
+    pattern: "prisma.*.findUnique"
+  - kind: call
+    pattern: "prisma.*.findFirst"
+  - kind: call
+    pattern: "prisma.*.findMany"
+  - kind: call
+    pattern: "prisma.*.update"
+  - kind: call
+    pattern: "prisma.*.delete"
+  - kind: call
+    pattern: "prisma.*.deleteMany"
+  - kind: call
+    pattern: "prisma.*.create"
+  # Mongoose
+  - kind: call
+    pattern: "*.findOne"
+  - kind: call
+    pattern: "*.findById"
+  - kind: call
+    pattern: "*.findByIdAndUpdate"
+  - kind: call
+    pattern: "*.findByIdAndDelete"
+  - kind: call
+    pattern: "*.updateOne"
+  - kind: call
+    pattern: "*.deleteOne"
+  # TypeORM / knex
+  - kind: call
+    pattern: "repository.findOne"
+  - kind: call
+    pattern: "repository.save"
+  - kind: call
+    pattern: "repository.delete"
+  - kind: call
+    pattern: "repository.update"
+  # Response + file
+  - kind: call
+    pattern: "res.sendFile"
+  - kind: call
+    pattern: "res.download"
+  - kind: call
+    pattern: "res.redirect"
+    description: "potential open-redirect"
+  # External
+  - kind: call
+    pattern: "axios.get"
+  - kind: call
+    pattern: "axios.post"
+  - kind: call
+    pattern: "fetch"
+  - kind: call
+    pattern: "https.get"
+  # Shell
+  - kind: call
+    pattern: "exec"
+  - kind: call
+    pattern: "execSync"
+  - kind: call
+    pattern: "spawn"
+
+sanitizers:
+  # Auth decorators / middleware — ONLY authz, not pure authn
+  # (connect/passport authenticate is authn; omit.)
+  - kind: call
+    pattern: "requireAuth"
+    description: "Project-local authz middleware"
+  - kind: call
+    pattern: "requireAdmin"
+  - kind: call
+    pattern: "requireRole"
+  - kind: call
+    pattern: "checkAccess"
+  - kind: call
+    pattern: "checkOwnership"
+  - kind: call
+    pattern: "verifyOwner"
+  - kind: call
+    pattern: "canAccess"
+  - kind: call
+    pattern: "assertOwner"
+  - kind: call
+    pattern: "assertPermission"
+  - kind: call
+    pattern: "authz"
+  # Decorators (NestJS idiom)
+  - kind: decorator
+    pattern: "UseGuards"
+  - kind: decorator
+    pattern: "Roles"
+  - kind: decorator
+    pattern: "RequirePermissions"
+
+sink_weights:
+  "db.query": "high"
+  "db.execute": "high"
+  "pool.query": "high"
+  "client.query": "high"
+  "prisma.*.delete": "high"
+  "prisma.*.deleteMany": "high"
+  "*.deleteOne": "high"
+  "*.findByIdAndDelete": "high"
+  "exec": "high"
+  "execSync": "high"
+  "spawn": "high"
+  "res.sendFile": "medium"
+  "res.redirect": "medium"
